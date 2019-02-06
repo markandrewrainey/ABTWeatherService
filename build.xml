@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<project name="WeatherUpdater" default="jar">
+	<property file="build.properties" />
+	
+	<!-- Gets the latest code from Perforce -->
+	<target name="P4Sync">
+		<p4sync view="//depot/WeatherUpdater/..." />
+	</target>
+	
+	<!-- Compiles the project -->
+	<target name="compile" depends="P4Sync">
+		<property name="build.dir" value="${project.dir}/build" />
+		<property name="build.classes.dir" value="${build.dir}/classes" />
+		<property name="lib.dir" value="${project.dir}/lib" />
+		<property name="src.dir" value="${project.dir}/src" />
+		
+		<delete dir="${build.classes.dir}" />
+		<mkdir dir="${build.classes.dir}" />
+		<javac srcdir="${src.dir}" destdir="${build.classes.dir}" debug="on" deprecation="off" optimize="on">
+			<classpath>
+				<pathelement location="${lib.dir}/dom4j-1.6.1.jar" />
+				<pathelement location="${lib.dir}/sqljdbc4.jar" />
+				<pathelement location="${lib.dir}/jaxen/EXML.jar" />
+				<pathelement location="${lib.dir}/jaxen/jaxen-core.jar" />
+				<pathelement location="${lib.dir}/jaxen/jaxen-dom.jar" />
+				<pathelement location="${lib.dir}/jaxen/jaxen-dom4j.jar" />
+				<pathelement location="${lib.dir}/jaxen/jaxen-exml.jar" />
+				<pathelement location="${lib.dir}/jaxen/jaxen-full.jar" />
+				<pathelement location="${lib.dir}/jaxen/jaxen-jdom.jar" />
+				<pathelement location="${lib.dir}/jaxen/jdom.jar" />
+				<pathelement location="${lib.dir}/jaxen/saxpath.jar" />
+			</classpath>
+			<include name="**/*.java" />
+		</javac>
+	</target>
+	
+	<!-- Builds the jar file -->
+	<target name="jar" depends="compile">
+		<jar jarfile="${build.dir}/weatherupdater.jar" compress="false">
+			<fileset dir="${build.classes.dir}">
+				<include name="**/**" />
+			</fileset>
+			<fileset dir="${project.dir}">
+				<include name="WeatherProperties.properties" />
+			</fileset>
+		</jar>
+	</target>
+	
+	<!-- Sends the jar file to the Builds folder -->
+	<target name="sendToBuildsFolder" depends="jar">
+		<move file="${build.dir}/weatherupdater.jar" todir="${builds.path}" />
+	</target>
+</project>
