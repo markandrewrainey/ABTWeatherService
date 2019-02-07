@@ -56,29 +56,34 @@ public class YahooWeatherParser {
 		return xmlReader;
   	}
 	
-	/** Parse the given InputStream as JSON, extracting weather info
-	 *  Create and init Weather object
-	 * 
-	 * @param inputStream
-	 * @return
-	 * @throws Exception
-	 */
-	public Weather parseJson(InputStream inputStream) throws Exception {
-	    Weather weather = null;
-	    JsonObject channel = parseJsonStream(inputStream);
-        if (channel.has("location")) {
+	   /** Parse the given InputStream as JSON, extracting weather info
+     *  Create and init Weather object
+     *  
+     * @param inputStream
+     * @return
+     * @throws Exception
+     */
+    public static Weather parseWeatherJson(InputStream inputStream) throws Exception {
+        Weather weather = null;
+        JsonObject response = parseJsonStream(inputStream);
+        if (response.has("location")) {
             weather = new Weather();
-            
-            JsonObject location = channel.get("location").getAsJsonObject();
-            JsonObject atmosphere = channel.get("atmosphere").getAsJsonObject();
-            JsonObject wind = channel.get("wind").getAsJsonObject();
-            JsonObject condition = channel.get("item").getAsJsonObject().get("condition").getAsJsonObject();
+            JsonObject location = response.get("location").getAsJsonObject();
+            JsonObject atmosphere = null;
+            JsonObject wind = null;
+            JsonObject condition = null;
+            if (response.has("current_observation")) {
+                JsonObject currObservation = response.get("current_observation").getAsJsonObject();
+                atmosphere = currObservation.get("atmosphere").getAsJsonObject();
+                wind = currObservation.get("wind").getAsJsonObject();
+                condition = currObservation.get("condition").getAsJsonObject();
+            }
             
             weather.setCity( getAsString(location.get("city")) );
             weather.setRegion( getAsString(location.get("region")) );
             weather.setCountry( getAsString(location.get("country")) );
             weather.setCondition( getAsString(condition.get("text")) );
-            weather.setTemp( getAsString(condition.get("temp")) );
+            weather.setTemp( getAsString(condition.get("temperature")) );
             weather.setChill( getAsString(wind.get("chill")) );
             weather.setHumidity( getAsString(atmosphere.get("humidity")) );
             weather.setPressure( getAsString(atmosphere.get("pressure")) );
@@ -86,15 +91,50 @@ public class YahooWeatherParser {
             weather.setWindSpeed( getAsString(wind.get("speed")) );
         }
 
-	    return weather;
-	}
-	
+        return weather;
+    }
+
+    /**
+     * Parse the given InputStream as JSON, extracting response JSON
+     * @param inputStream
+     * @return
+     * @throws Exception
+     */
+    private static JsonObject parseJsonStream(InputStream inputStream) {
+        JsonObject response = null;
+        
+        try {
+            BufferedReader in = new BufferedReader(new InputStreamReader(inputStream));
+
+            String resultLine;
+            StringBuffer resultJsonString = new StringBuffer();
+            while ((resultLine = in.readLine()) != null) {
+                resultJsonString.append(resultLine);
+            }
+            in.close();
+
+            JsonParser parser = new JsonParser();
+            JsonElement data = parser.parse(resultJsonString.toString());
+            if (data != null && data.isJsonObject()) {
+                response = data.getAsJsonObject();
+                System.err.println(response);
+            }
+          } catch (JsonSyntaxException e) {
+              e.printStackTrace();
+          } catch (IOException e) {
+              e.printStackTrace();
+          }
+        return response != null ? response : new JsonObject();
+    }
+
 	/** Parse the given InputStream as JSON.
 	 *  Return the "channel" object if it exists, otherwise, return an empty JsonObject
+	 *  Deprecated due to change in JSON format with new API
 	 * @param inputStream
 	 * @return
 	 */
-	private JsonObject parseJsonStream(InputStream inputStream) {
+    @Deprecated
+    private static JsonObject parseJsonStreamOld(InputStream inputStream) {
 	    JsonObject channel = null;
 	    
         try {
@@ -127,7 +167,7 @@ public class YahooWeatherParser {
         return channel != null ? channel : new JsonObject();
 	}
 	
-    public String getAsString(JsonElement jsonElem) {
+    public static String getAsString(JsonElement jsonElem) {
         String value = "";
         
         if ((jsonElem != null) &&

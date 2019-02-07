@@ -1,6 +1,6 @@
 package com.abouttimetech.weatherupdater;
 
-public class Weather 
+public class Weather
 {
 	private String jobName;
 	private String zipCode;
