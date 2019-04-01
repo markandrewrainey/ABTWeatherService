@@ -21,8 +21,6 @@ import javax.net.ssl.HttpsURLConnection;
 
 import com.microsoft.sqlserver.jdbc.SQLServerDataSource;
 
-
-
 public class WeatherUpdater extends Thread {
 
     private static String consumer_key = null;
@@ -49,6 +47,11 @@ public class WeatherUpdater extends Thread {
 		System.out.println("Checkpoint before while of run : runWeatherThread = " +runWeatherThread);
 		while (runWeatherThread){
 			
+		    String city;
+		    String state;
+		    String zip;
+		    String country;
+		    String locationParams;
 			String woeid;
 			int jobId;
 			String jobName;
@@ -71,13 +74,18 @@ public class WeatherUpdater extends Thread {
 			try {
 				while (ActiveJobs.next()) {
 					//get job data active jobs from the job table
+				    city = ActiveJobs.getString("city");
+				    state = ActiveJobs.getString("state");
+				    zip = ActiveJobs.getString("zip");
+				    country = ActiveJobs.getString("country");
+				    locationParams = getLocationParams(city, state, zip, country);
 					woeid = ActiveJobs.getString("woeid");
 					jobId = ActiveJobs.getInt("jobId");
 					jobCode = ActiveJobs.getString("jobCode");
 					String ajJobName = ActiveJobs.getString("jobName");
 					jobName = ajJobName.replace("'", "''");
 					
-					Weather weather = getWeather(woeid);
+					Weather weather = getWeather(woeid, locationParams);
 					if (weather != null){
     					System.out.println(weather.getVisibility());
     				    System.out.println("Weather Data set for " +jobName+ " and " +jobCode+ ".");
@@ -170,16 +178,20 @@ public class WeatherUpdater extends Thread {
 		}
 	}
 
-	private Weather getWeather(String woeid) {
+	private Weather getWeather(String woeid, String locationParams) {
 	    Weather weather = null;
-	    String webArg = getWebArg(woeid);
+	    String webArg = getWebArg(woeid, locationParams);
 	    
 	    if (!webArg.isEmpty()) {
 	        // First, check cache to see if we have recently retrieved weather for location
 	        weather = weatherMap.get(webArg);
 	        
 	        if (weather == null) {
-	            weather = getWeatherFromServer(woeid);
+	            if (webArg.equals(woeid)) {
+	                weather = getWeatherFromServerRequest("woeid", webArg);
+	            } else {
+	                weather = getWeatherFromServerRequest("location", webArg);
+	            }
 	            if (weather != null) {
 	                weatherMap.put(webArg, weather);
 	            }
@@ -190,10 +202,13 @@ public class WeatherUpdater extends Thread {
 	}
 	
 	/** Get the key representing the Weather results */
-	private String getWebArg(String woeid) {
+	private String getWebArg(String woeid, String locationParams) {
 	    String webArg = "";
 	    if (woeid != null && woeid.length() > 0){
-	        webArg = "woeid=" + woeid;
+	        webArg = woeid;
+	    }
+	    else if (locationParams != null && !locationParams.isEmpty()) {
+	        webArg = locationParams;
 	    }
 	    return webArg;
 	}
@@ -226,7 +241,7 @@ public class WeatherUpdater extends Thread {
 	    Weather weather = null;
         //retrieve weather data for item from website
         try {
-            InputStream websiteWeatherData = retrieveWebsiteWeather(getWebArg(woeid));
+            InputStream websiteWeatherData = retrieveWebsiteWeather(getWebArg(woeid,""));
             if (websiteWeatherData != null){
                 //parse data from xml format into Weather Class
                 weather = new YahooWeatherParser().parse(websiteWeatherData);
@@ -408,7 +423,7 @@ public class WeatherUpdater extends Thread {
 		ResultSet activeJobs = null;
 		try 
 		{
-			activeJobs = conn.createStatement().executeQuery("select zip, woeid, jobId, jobName, jobCode from Job where active = 1");
+			activeJobs = conn.createStatement().executeQuery("select city, state, zip, country, woeid, jobId, jobName, jobCode from Job where active = 1");
 		} 
 		catch (SQLException e) 
 		{			
@@ -420,11 +435,20 @@ public class WeatherUpdater extends Thread {
 		return activeJobs;
 	}
 
-    private Weather getWeatherFromServer(String woeid) {
+	/**
+	 * Make a yahoo API Request to get the weather forcast
+	 * 'query' and params must be kept separate for use in oAuth signature generation
+	 * Process JSON response as a weather response
+	 * 
+	 * @param query ("woeid" or "location")
+	 * @param params (query params)
+	 * @return Weather (or null if none returned)
+	 */
+    private Weather getWeatherFromServerRequest(String query, String params) {
         Weather weather = null;
         //retrieve weather data for item from website
         try {
-            InputStream websiteWeatherData = yahooApiRequest("woeid", woeid);
+            InputStream websiteWeatherData = yahooApiRequest(query, params);
             if (websiteWeatherData != null){
                 //parse data from json format into Weather Class
                 weather = YahooWeatherParser.parseWeatherJson(websiteWeatherData);
@@ -438,6 +462,21 @@ public class WeatherUpdater extends Thread {
             e.printStackTrace();
         }
         return weather;
+    }
+
+    /** Generate Yahoo API Request "location" parameters */
+    private String getLocationParams(String city, String state, String zip, String country) {
+        String locationParams = "";
+        if (city != null && !city.trim().isEmpty()) {
+            locationParams = city.trim();
+            if (state != null && !state.trim().isEmpty()) {
+                locationParams += "," + state.trim();
+            }
+            else if (country != null && !country.trim().isEmpty()) {
+                locationParams += "," + country.trim();
+            }
+        }
+        return locationParams;
     }
 
 	private InputStream retrieveYqlWeather(String zip, String woeid) throws Exception {
@@ -617,7 +656,7 @@ public class WeatherUpdater extends Thread {
             
             String authorizationLine = generateYahooApiAuthorization(query, params);
             urlConn.setRequestProperty ("Authorization", authorizationLine);
-            urlConn.setRequestProperty ("Yahoo-App-Id", appId);
+            urlConn.setRequestProperty ("X-Yahoo-App-Id", appId);
             urlConn.setRequestProperty ("Content-Type", "application/json");
             urlConn.setRequestMethod("GET");
             

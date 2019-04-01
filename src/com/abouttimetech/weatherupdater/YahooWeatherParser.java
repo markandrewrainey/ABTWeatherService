@@ -67,28 +67,35 @@ public class YahooWeatherParser {
         Weather weather = null;
         JsonObject response = parseJsonStream(inputStream);
         if (response.has("location")) {
-            weather = new Weather();
             JsonObject location = response.get("location").getAsJsonObject();
-            JsonObject atmosphere = null;
-            JsonObject wind = null;
-            JsonObject condition = null;
-            if (response.has("current_observation")) {
-                JsonObject currObservation = response.get("current_observation").getAsJsonObject();
-                atmosphere = currObservation.get("atmosphere").getAsJsonObject();
-                wind = currObservation.get("wind").getAsJsonObject();
-                condition = currObservation.get("condition").getAsJsonObject();
-            }
             
-            weather.setCity( getAsString(location.get("city")) );
-            weather.setRegion( getAsString(location.get("region")) );
-            weather.setCountry( getAsString(location.get("country")) );
-            weather.setCondition( getAsString(condition.get("text")) );
-            weather.setTemp( getAsString(condition.get("temperature")) );
-            weather.setChill( getAsString(wind.get("chill")) );
-            weather.setHumidity( getAsString(atmosphere.get("humidity")) );
-            weather.setPressure( getAsString(atmosphere.get("pressure")) );
-            weather.setVisibility( getAsString(atmosphere.get("visibility")) );
-            weather.setWindSpeed( getAsString(wind.get("speed")) );
+            // Check for empty response {"location":{},"current_observation":{},"forecasts":[]}
+            if (location.has("city")) { 
+                JsonObject atmosphere = null;
+                JsonObject wind = null;
+                JsonObject condition = null;
+                boolean hasCurrentObservation = response.has("current_observation");
+                if (hasCurrentObservation) {
+                    JsonObject currObservation = response.get("current_observation").getAsJsonObject();
+                    atmosphere = currObservation.get("atmosphere").getAsJsonObject();
+                    wind = currObservation.get("wind").getAsJsonObject();
+                    condition = currObservation.get("condition").getAsJsonObject();
+                }
+                
+                weather = new Weather();
+                weather.setCity( getAsString(location.get("city")) );
+                weather.setRegion( getAsString(location.get("region")) );
+                weather.setCountry( getAsString(location.get("country")) );
+                if (hasCurrentObservation) {
+                    weather.setCondition( getAsString(condition.get("text")) );
+                    weather.setTemp( getAsString(condition.get("temperature")) );
+                    weather.setChill( getAsString(wind.get("chill")) );
+                    weather.setHumidity( getAsString(atmosphere.get("humidity")) );
+                    weather.setPressure( getAsString(atmosphere.get("pressure")) );
+                    weather.setVisibility( getAsString(atmosphere.get("visibility")) );
+                    weather.setWindSpeed( getAsString(wind.get("speed")) );
+                }
+            }
         }
 
         return weather;
