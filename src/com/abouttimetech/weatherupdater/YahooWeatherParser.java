@@ -124,7 +124,6 @@ public class YahooWeatherParser {
             JsonElement data = parser.parse(resultJsonString.toString());
             if (data != null && data.isJsonObject()) {
                 response = data.getAsJsonObject();
-                System.err.println(response);
             }
           } catch (JsonSyntaxException e) {
               e.printStackTrace();
