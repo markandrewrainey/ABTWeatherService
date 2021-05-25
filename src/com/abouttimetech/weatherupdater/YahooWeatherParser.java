@@ -23,6 +23,7 @@ import com.google.gson.JsonSyntaxException;
  *  Copyright 2010. All rights reserved About Time Technologies, L.L.C.
  */
 public class YahooWeatherParser {
+	boolean yahoo = false;
 	
 	public Weather parse(InputStream inputStream) throws Exception {
 	    Weather weather = new Weather();
@@ -46,7 +47,14 @@ public class YahooWeatherParser {
 
 	private SAXReader createXmlReader() {
 		Map<String,String> uris = new HashMap<String,String>();
-		uris.put( "y", "http://xml.weather.yahoo.com/ns/rss/1.0" );
+		if(yahoo)
+		{
+			uris.put( "y", "http://xml.weather.yahoo.com/ns/rss/1.0" );
+		}
+		else
+		{
+			uris.put( "abtt_dev", "api.openweathermap.org/data/2.5/forecast?id=524901&appid={b5a56faf31762cd439f74d19585a7db4}" );
+		}
         
 		DocumentFactory factory = new DocumentFactory();
 		factory.setXPathNamespaceURIs( uris );
@@ -95,6 +103,47 @@ public class YahooWeatherParser {
 
         return weather;
     }
+    
+    /** Parse the given InputStream as JSON, extracting weather info
+     *  Create and init Weather object
+     *  
+     * @param inputStream
+     * @return
+     * @throws Exception
+     */
+    public static Weather parseWeatherJsonNew(InputStream inputStream) throws Exception {
+        Weather weather = null;
+        JsonObject response = parseJsonStream(inputStream);
+        if (response.has("location")) {
+            try {
+                JsonObject location = response.get("location").getAsJsonObject();
+                JsonObject atmosphere = null;
+                JsonObject wind = null;
+                JsonObject condition = null;
+                JsonObject currObservation = response.get("current").getAsJsonObject();
+                //atmosphere = currObservation.get("atmosphere").getAsJsonObject();
+                //wind = currObservation.get("wind_mph").getAsJsonObject();
+                condition = currObservation.get("condition").getAsJsonObject();
+                
+                weather = new Weather();
+                weather.setCity( getAsString(location.get("name")) );
+                weather.setRegion( getAsString(location.get("region")) );
+                weather.setCountry( getAsString(location.get("country")) );
+                weather.setCondition( getAsString(condition.get("text")) );
+                weather.setTemp( getAsString(currObservation.get("temp_f")) );
+                weather.setChill( getAsString(currObservation.get("feelslike_f")) );
+                weather.setHumidity( getAsString(currObservation.get("humidity")) );
+                weather.setPressure( getAsString(currObservation.get("pressure_in")) );
+                weather.setVisibility( getAsString(currObservation.get("vis_miles")) );
+                weather.setWindSpeed( getAsString(currObservation.get("wind_mph")) );
+            } catch (NullPointerException e) {
+                // Ignore empty response {"location":{},"current_observation":{},"forecasts":[]} parsing errors
+            }
+        }
+
+        return weather;
+    }
+
 
     /**
      * Parse the given InputStream as JSON, extracting response JSON

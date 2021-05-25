@@ -13,6 +13,8 @@ import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import javax.net.ssl.HttpsURLConnection;
 
+
+
 //import oauth.signpost.OAuthConsumer;
 //import oauth.signpost.basic.DefaultOAuthConsumer;
 //import oauth.signpost.exception.OAuthCommunicationException;
@@ -45,6 +47,12 @@ public class WeatherUpdater extends Thread {
 		System.out.println("Checkpoint run start : runWeatherThread = " +runWeatherThread);
 		WeatherThreadRunning();	
 		System.out.println("Checkpoint before while of run : runWeatherThread = " +runWeatherThread);
+		String ipAddress = "demo.db.com";
+		String dbName = "korydb";
+		String dbPassword = "abttdev";
+		
+		//String var = "jdbc:mysql://" + ipAddress + "/" + dbName + "?" + "user=" + dbName + "&password=" + dbPassword;
+		//System.out.println(var);
 		while (runWeatherThread){
 			
 		    String city;
@@ -63,7 +71,9 @@ public class WeatherUpdater extends Thread {
 			int windSpeed;
 			Connection currentConnection;
 			
+			
 			currentConnection = ConnectToATSQLDB(getDBName());
+			
 			
 			weatherMap = new HashMap<String, Weather>(); // New map each refresh cycle, always refresh 1st time
 			
@@ -85,7 +95,7 @@ public class WeatherUpdater extends Thread {
 					String ajJobName = ActiveJobs.getString("jobName");
 					jobName = ajJobName.replace("'", "''");
 					
-					Weather weather = getWeather(woeid, locationParams);
+					Weather weather = getWeather(woeid, zip);
 					if (weather != null){
     					System.out.println(weather.getVisibility());
     				    System.out.println("Weather Data set for " +jobName+ " and " +jobCode+ ".");
@@ -148,7 +158,7 @@ public class WeatherUpdater extends Thread {
     				    System.out.println("Data Inserted");
 					}
 					else{
-					    System.out.println("No WOEID to process job: " + jobName);
+					    System.out.println("No Zip to process job: " + jobName);
 	                }
 				}
 			} 
@@ -160,7 +170,7 @@ public class WeatherUpdater extends Thread {
 				e.printStackTrace();
 			}
 
-			DisconnectFromATSQLDB(ConnectToATSQLDB(getDBName()));
+			//DisconnectFromATSQLDB(ConnectToATSQLDB(getDBName()));
 			System.out.println("Database Connection Closed");
 			System.out.println("Thread is sleeping");
 			
@@ -188,9 +198,9 @@ public class WeatherUpdater extends Thread {
 	        
 	        if (weather == null) {
 	            if (webArg.equals(woeid)) {
-	                weather = getWeatherFromServerRequest("woeid", webArg);
+	                weather = getWeatherFromServerRequest("woeid", locationParams);
 	            } else {
-	                weather = getWeatherFromServerRequest("location", webArg);
+	                weather = getWeatherFromServerRequest("location", locationParams);
 	            }
 	            if (weather != null) {
 	                weatherMap.put(webArg, weather);
@@ -289,7 +299,32 @@ public class WeatherUpdater extends Thread {
 		
 	}
 	
-	public static Connection ConnectToATSQLDB(String DBName){
+	private static Connection ConnectToATSQLDB(String dbName)
+	{
+		SQLServerDataSource ds = new SQLServerDataSource();
+		Connection conn = null;
+		try
+		{
+			if (conn == null) {
+			    ds.setUser("abttdev");// was"abttdev"
+			    ds.setPassword("abttdev");
+			    ds.setServerName("demodb.abouttimetech.net");
+			    ds.setPortNumber(50001);
+			    ds.setDatabaseName(dbName);
+			    System.err.println("Attemping Connect...");
+			    conn = ds.getConnection();
+			    System.err.println("Connected!");
+			}
+		} catch (SQLException e) {
+			
+			e.printStackTrace();
+			System.out.println("There was an error connecting to the database.");
+			//Write this error to the log file
+		}
+		return conn;
+	}
+	
+	/*public static Connection ConnectToATSQLDB(String DBName){
 		Connection conn = null;
 		SQLServerDataSource database = new SQLServerDataSource();
 		
@@ -306,7 +341,7 @@ public class WeatherUpdater extends Thread {
 		}
 		
 		return conn;
-	}
+	}*/
 	
 	public static void DisconnectFromATSQLDB(Connection conn){
 		
@@ -448,10 +483,10 @@ public class WeatherUpdater extends Thread {
         Weather weather = null;
         //retrieve weather data for item from website
         try {
-            InputStream websiteWeatherData = yahooApiRequest(query, params);
+            InputStream websiteWeatherData = openWeatherApiRequest(query, params);
             if (websiteWeatherData != null){
                 //parse data from json format into Weather Class
-                weather = YahooWeatherParser.parseWeatherJson(websiteWeatherData);
+                weather = YahooWeatherParser.parseWeatherJsonNew(websiteWeatherData);
                 //close the input stream from website
                 websiteWeatherData.close();
                 websiteWeatherData = null;
@@ -634,7 +669,94 @@ public class WeatherUpdater extends Thread {
     final String consumerKey = "dj0yJmk9ZzczamtXcWJIbHZ0JnM9Y29uc3VtZXJzZWNyZXQmc3Y9MCZ4PWIy";
     final String consumerSecret = "c39b944a495eb345d8f6c24daadd6e5b492b2129";
     final String ydnUrl = "https://weather-ydn-yql.media.yahoo.com/forecastrss";
+    //api.openweathermap.org/data/2.5/weather?zip=94040,us&appid=
+    
+    private InputStream openWeatherApiRequest(String query, String zip) {
+        InputStream response = null;
+        try {
+        	//api.openweathermap.org/data/2.5/weather?zip=84653,us&appid=b5a56faf31762cd439f74d19585a7db4
+        	/* HttpClient client = HttpClient.newHttpClient();
+        	    HttpRequest request = HttpRequest.newBuilder()
+        	          .uri(URI.create(uri))
+        	          .build();
 
+        	    HttpResponse<String> response =
+        	          client.send(request, BodyHandlers.ofString());*/
+
+        	    //System.out.println(response.body());
+        	    
+        	/*HttpClient client = HttpClient.newHttpClient();
+        	   HttpRequest request = HttpRequest.newBuilder()
+        	         .uri(URI.create("http://foo.com/"))
+        	         .build();
+        	   client.sendAsync(request, BodyHandlers.ofString())
+        	         .thenApply(HttpResponse::body)
+        	         .thenAccept(System.out::println)
+        	         .join(); */
+            //URL url = URI.create("api.openweathermap.org/data/2.5/weather?zip=" + URLEncoder.encode("84653", "UTF-8") + ",us&appid=" + URLEncoder.encode("b5a56faf31762cd439f74d19585a7db4", "UTF-8")).toURL();
+        	// Create a neat value object to hold the URL
+        	/*URL url = new URL("http://api.openweathermap.org/data/2.5/weather?zip=84653,us&appid=b5a56faf31762cd439f74d19585a7db4");
+
+        	// Open a connection(?) on the URL(??) and cast the response(???)
+        	HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+        	connection.setRequestProperty("accept", "application/json");
+
+        	// This line makes the request
+        	InputStream responseStream = connection.getInputStream();
+        	ObjectMapper mapper = new ObjectMapper();
+        	APOD apod = mapper.readValue(responseStream, APOD.class);
+
+        	// Finally we have the response*/
+        	System.out.println("HERE");
+        	//http://api.weatherapi.com/v1/current.json?key=ac5fc6bc9edb4f5589d161159211105&q=84653&aqi=no
+        	//URL url = new URL("https://api.openweathermap.org/data/2.5/weather?zip=84653,us&appid=b5a56faf31762cd439f74d19585a7db4");
+        	URL url = new URL("http://api.weatherapi.com/v1/current.json?key=ac5fc6bc9edb4f5589d161159211105&q=" + zip + "&aqi=no");
+        	HttpURLConnection connection = (HttpURLConnection)url.openConnection();
+        	connection.setRequestMethod("GET");
+        	connection.connect();
+
+        	response = connection.getInputStream();
+        	/*BufferedReader br = new BufferedReader(new InputStreamReader((connection.getInputStream())));
+        	StringBuilder sb = new StringBuilder();
+        	String output;
+        	while ((output = br.readLine()) != null) {
+        	  sb.append(output);
+        	}
+        	System.out.println(sb.toString());*/
+        	
+        	
+        	
+        	
+        	//URL url = URI.create("https://api.openweathermap.org/data/2.5/weather?zip=84653,us&appid=b5a56faf31762cd439f74d19585a7db4").toURL();
+        	
+        	//String val = url.openConnection().getContent().toString();
+        	//System.out.println(val);
+           /* HttpsURLConnection urlConn = (HttpsURLConnection)url.openConnection().getContent();
+            urlConn.setDoInput (true);
+            urlConn.setDoOutput (true);
+            urlConn.setUseCaches (false);*/
+            
+            /*String authorizationLine = generateYahooApiAuthorization(query, params);
+            urlConn.setRequestProperty ("Authorization", authorizationLine);
+            urlConn.setRequestProperty ("X-Yahoo-App-Id", appId);
+            urlConn.setRequestProperty ("Content-Type", "application/json");
+            urlConn.setRequestMethod("GET");*/
+            
+           /* urlConn.connect();
+            if (urlConn.getResponseCode() == HttpsURLConnection.HTTP_OK) {
+                response = urlConn.getInputStream();
+            } else {
+                System.err.println(urlConn.getResponseCode() + " " + urlConn.getResponseMessage());
+                System.err.println(url);
+            }*/
+        } catch (IOException e) {
+            System.out.println(e.getMessage());
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
+        
+        return response;
+    }
     /**
      * 01/29/2019
      * Hits new Yahoo weather endpoint (see https://developer.yahoo.com/weather/documentation.html)
